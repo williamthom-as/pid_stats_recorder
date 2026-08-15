@@ -1,0 +1,13 @@
+name: pid_stats_recorder
+version: 0.1.0
+
+authors:
+  - william <me@williamthom.as>
+
+targets:
+  pid_stats_recorder:
+    main: src/pid_stats_recorder.cr
+
+crystal: '>= 1.21.0'
+
+license: MIT
