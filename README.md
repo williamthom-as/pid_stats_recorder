@@ -23,13 +23,7 @@ All options:
 - `Ctrl+C` stop, prints RSS/swap/CPU min/avg/max calcs for monitored window
 
 Examples
-- ./bin/pid_stats_recorder --process 12345
-- ./bin/pid_stats_recorder --process 12345 --frequency 5
-- ./bin/pid_stats_recorder --process 12345 --export
-- ./bin/pid_stats_recorder --process 12345 --export=run1.csv
-
-<small>
-Note: --export file name must be attached (--export=name.csv) if you want to set file name,
-running `--export name.csv` won't work. Just running `--export` will use default name
-of `pid_stats_recorder_<pid>_<timestamp>.csv` in the current directory.
-</small>
+- `./bin/pid_stats_recorder --process 12345`
+- `./bin/pid_stats_recorder --process 12345 --frequency 5`
+- `./bin/pid_stats_recorder --process 12345 --export`
+- `./bin/pid_stats_recorder --process 12345 --export=run1.csv`
