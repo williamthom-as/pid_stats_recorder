@@ -64,6 +64,7 @@ module PidStatsRecorder
 
     Log.info { "CPU  min/avg/max (%): #{cpu_min}/#{cpu_avg}/#{cpu_max}" }
 
+
     if local_exporter = exporter
       local_exporter.close
       Log.info { "Exported to #{local_exporter.file_name}" }
@@ -72,12 +73,26 @@ module PidStatsRecorder
     exit
   end
 
-  loop do
-    sample = monitor.stats
-    tracker.record(sample)
-    exporter.try &.write(sample)
-    Log.info { "RSS: #{(sample.rss_kb / 1024.0).round(1)} MB  Swap: #{(sample.swap_kb / 1024.0).round(1)} MB  CPU: #{sample.cpu_percent.try &.round(1)}%" }
+  Signal::INT.trap { finish.call}
 
-    sleep frequency.seconds
+  loop do
+    begin
+      sample = monitor.stats
+      tracker.record(sample)
+      exporter.try &.write(sample)
+
+      Log.info { 
+        "RSS: #{(sample.rss_kb / 1024.0).round(1)} MB  Swap: #{(sample.swap_kb / 1024.0).round(1)} MB  CPU: #{sample.cpu_percent.try &.round(1)}%" 
+      }
+
+      sleep frequency.seconds
+
+    rescue File::NotFoundError
+      Log.error { "Process #{local_pid} no longer exists. Exiting..." }
+
+      finish.call
+
+      exit
+    end
   end
 end
