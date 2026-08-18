@@ -4,16 +4,25 @@ module PidStatsRecorder
   class Export
     getter file_name : String
 
-    def initialize(@file_name : String)
+    @keys : Array(String)
+
+    def initialize(@file_name : String, @metrics : Array(Metric))
+      @keys = @metrics.map(&.key)
       @file = File.open(@file_name, "w")
       @csv = CSV::Builder.new(@file)
-      @csv.row "recorded_at", "rss_kb", "swap_kb", "cpu_percent"
+    end
+
+    def write(sample : Monitor::SampleResult) : Nil
+      @csv.row(sample.to_row(@keys))
       @file.flush
     end
 
-    def write(sample : Monitor::Stat) : Nil
-      @csv.row sample.recorded_at, sample.rss_kb, sample.swap_kb, sample.cpu_percent
+    def write_header
+      labels = @metrics.map { |metric| "#{metric.key} (#{metric.unit})" }
+      @csv.row(["recorded_at"] + labels)
       @file.flush
+
+      self
     end
 
     def close : Nil
