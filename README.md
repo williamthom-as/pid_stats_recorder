@@ -19,6 +19,7 @@ All options:
 - `--process PID` required, pid to monitor
 - `--frequency SECONDS` sampling interval, default 1
 - `--export[=FILENAME]` write csv (add filename or use default)
+- `--metrics METRICS` comma separated metrics list to monitor, default all (rss,swap,cpu,threads)
 - `--help` help
 - `Ctrl+C` stop, prints RSS/swap/CPU min/avg/max calcs for monitored window
 

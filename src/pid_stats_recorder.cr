@@ -14,13 +14,13 @@ module PidStatsRecorder
   pid : Int32? = nil
   frequency = 1
   file_name = nil
-  metrics = ["rss", "swap", "cpu"]
+  metrics = ["rss", "swap", "cpu", "threads"]
 
   OptionParser.parse(gnu_optional_args: true) do |parser|
     parser.banner = "Usage: pid_stats_recorder --process PID [arguments]"
     parser.on("-p PID", "--process PID", "PID to monitor (required)") { |p| pid = p.to_i }
     parser.on("-f SECONDS", "--frequency SECONDS", "Sampling interval in seconds") { |f| frequency = f.to_i }
-    parser.on("-m METRICS", "--metrics METRICS", "Metrics to monitor (comma separated list (ex: rss,swap,cpu))") { |m| metrics = m.split(",") }
+    parser.on("-m METRICS", "--metrics METRICS", "Metrics to monitor (comma separated list (ex: rss,swap,cpu,threads))") { |m| metrics = m.split(",") }
     parser.on("-e [FILENAME]", "--export [FILENAME]", "Export to file as CSV (file name not required)") { |f| file_name = f }
     parser.on("-h", "--help", "Show help") { puts parser; exit }
   end
