@@ -1,6 +1,7 @@
 require "log"
 require "option_parser"
 
+require "./pid_stats_recorder/metric"
 require "./pid_stats_recorder/monitor"
 require "./pid_stats_recorder/stats"
 require "./pid_stats_recorder/export"
@@ -13,16 +14,19 @@ module PidStatsRecorder
   pid : Int32? = nil
   frequency = 1
   file_name = nil
+  metrics = ["rss", "swap", "cpu"]
 
   OptionParser.parse(gnu_optional_args: true) do |parser|
     parser.banner = "Usage: pid_stats_recorder --process PID [arguments]"
     parser.on("-p PID", "--process PID", "PID to monitor (required)") { |p| pid = p.to_i }
     parser.on("-f SECONDS", "--frequency SECONDS", "Sampling interval in seconds") { |f| frequency = f.to_i }
+    parser.on("-m METRICS", "--metrics METRICS", "Metrics to monitor (comma separated list (ex: rss,swap,cpu))") { |m| metrics = m.split(",") }
     parser.on("-e [FILENAME]", "--export [FILENAME]", "Export to file as CSV (file name not required)") { |f| file_name = f }
     parser.on("-h", "--help", "Show help") { puts parser; exit }
   end
 
   local_pid = pid
+
   unless local_pid
     STDERR.puts "Error: --process PID is required"
     exit 1
@@ -35,35 +39,23 @@ module PidStatsRecorder
 
   Log.info { "Monitoring process #{local_pid} every #{frequency}s (Ctrl+C to stop)" }
 
-  monitor = Monitor.new(local_pid)
+  monitor = Monitor.new(local_pid, metrics)
   tracker = Stats.new
 
   exporter = if requested_file_name = file_name
-    resolved_file_name = requested_file_name.empty? ? "pid_stats_recorder_#{local_pid}_#{Time.local.to_s("%Y%m%d_%H%M%S")}.csv" : requested_file_name
-    Export.new(resolved_file_name).tap { |export| Log.info { "Exporting to #{export.file_name}" } }
-  end
+               resolved_file_name = requested_file_name.empty? ? "#{Time.local.to_s("%Y%m%d_%H%M%S")}_#{local_pid}.csv" : requested_file_name
 
-  Signal::INT.trap do
-    rss_min = (tracker.rss_min / 1024.0).round(1)
-    rss_avg = (tracker.rss_avg / 1024.0).round(1)
-    rss_max = (tracker.rss_max / 1024.0).round(1)
+               Export.new(resolved_file_name, monitor.metrics)
+                 .write_header
+                 .tap { |export| Log.info { "Exporting to #{export.file_name}" } }
+             end
 
-    Log.info {
-      "RSS  min/avg/max (MB): #{rss_min}/#{rss_avg}/#{rss_max}"
-    }
+  finish = -> do
+    monitor.metrics.each do |metric|
+      pre_label = "#{metric.key} (#{metric.unit}): "
 
-    swap_min = (tracker.swap_min / 1024.0).round(1)
-    swap_avg = (tracker.swap_avg / 1024.0).round(1)
-    swap_max = (tracker.swap_max / 1024.0).round(1)
-
-    Log.info { "Swap min/avg/max (MB): #{swap_min}/#{swap_avg}/#{swap_max}" }
-
-    cpu_min = tracker.cpu_min.try &.round(1)
-    cpu_avg = tracker.cpu_avg.try &.round(1)
-    cpu_max = tracker.cpu_max.try &.round(1)
-
-    Log.info { "CPU  min/avg/max (%): #{cpu_min}/#{cpu_avg}/#{cpu_max}" }
-
+      Log.info { pre_label + tracker.summarise(metric.key) }
+    end
 
     if local_exporter = exporter
       local_exporter.close
@@ -73,20 +65,17 @@ module PidStatsRecorder
     exit
   end
 
-  Signal::INT.trap { finish.call}
+  Signal::INT.trap { finish.call }
 
   loop do
     begin
-      sample = monitor.stats
+      sample : Monitor::SampleResult = monitor.sample
       tracker.record(sample)
       exporter.try &.write(sample)
 
-      Log.info { 
-        "RSS: #{(sample.rss_kb / 1024.0).round(1)} MB  Swap: #{(sample.swap_kb / 1024.0).round(1)} MB  CPU: #{sample.cpu_percent.try &.round(1)}%" 
-      }
+      Log.info { sample.to_s }
 
       sleep frequency.seconds
-
     rescue File::NotFoundError
       Log.error { "Process #{local_pid} no longer exists. Exiting..." }
 

@@ -1,56 +1,35 @@
 module PidStatsRecorder
   class Stats
-    getter samples : Array(Monitor::Stat)
+    getter samples : Hash(String, Array(Float64))
 
     def initialize
-      @samples = [] of Monitor::Stat
+      @samples = Hash(String, Array(Float64)).new { |h, k| h[k] = [] of Float64 }
     end
 
-    def record(stat : Monitor::Stat)
-      @samples << stat
+    def record(sample : Monitor::SampleResult) : Nil
+      sample.samples.each do |key, value|
+        @samples[key] << value if value
+      end
     end
 
-    def rss_min : Int32
-      @samples.map(&.rss_kb).min
+    def summarise(key : String) : String
+      content = "#{min(key)}/#{avg(key)}/#{max(key)} (min/avg/max)"
     end
 
-    def rss_max : Int32
-      @samples.map(&.rss_kb).max
+    def min(key : String) : Float64?
+      @samples[key]?.try(&.min?).try(&.round(2))
     end
 
-    def rss_avg : Float64
-      @samples.map(&.rss_kb).sum.to_f / @samples.size
+    def max(key : String) : Float64?
+      @samples[key]?.try(&.max?).try(&.round(2))
     end
 
-    def swap_min : Int32
-      @samples.map(&.swap_kb).min
-    end
+    def avg(key : String) : Float64?
+      values = @samples[key]?
 
-    def swap_max : Int32
-      @samples.map(&.swap_kb).max
-    end
+      return nil if !values || values.empty?
 
-    def swap_avg : Float64
-      @samples.map(&.swap_kb).sum.to_f / @samples.size
-    end
-
-    def cpu_min : Float64?
-      cpu_samples.min?
-    end
-
-    def cpu_max : Float64?
-      cpu_samples.max?
-    end
-
-    def cpu_avg : Float64?
-      samples = cpu_samples
-      return nil if samples.empty?
-
-      samples.sum.to_f / samples.size
-    end
-
-    private def cpu_samples : Array(Float64)
-      @samples.compact_map(&.cpu_percent)
+      (values.sum / values.size).round(2)
     end
   end
 end
